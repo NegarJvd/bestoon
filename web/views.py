@@ -1,5 +1,7 @@
 from json import JSONEncoder
 from datetime import datetime
+
+from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.utils.crypto import get_random_string
@@ -94,3 +96,21 @@ def submit_income(request):
     return JsonResponse({
         'status': 'ok'
     }, encoder=JSONEncoder)
+
+
+@csrf_exempt
+@require_POST
+def generalStat(request):
+    # TODO: should get a valid duration (from - to), if not, use 1 month
+    # TODO: is the token valid?
+    this_token = request.POST['token']
+    this_user = get_object_or_404(User, token__token=this_token)
+    income = Income.objects.filter(user=this_user).aggregate(Count('amount'), Sum('amount'))
+    expense = Expense.objects.filter(user=this_user).aggregate(Count('amount'), Sum('amount'))
+    context = {}
+    context['expense'] = expense
+    context['income'] = income
+    context['finance'] = (income['amount__sum'] if income['amount__count'] > 0 else 0) - (expense['amount__sum'] if expense['amount__count'] > 0 else 0)
+    context['status'] = 'ok'
+    return JsonResponse(context, encoder=JSONEncoder)
+
